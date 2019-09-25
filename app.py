@@ -22,7 +22,7 @@ handler.setFormatter(
 )
 app.logger.addHandler(handler)
 
-app.config['ALLOWED_EXTENSIONS'] = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif','onnx'])
+app.config['ALLOWED_EXTENSIONS'] = set(['onnx'])
 
 
 def allowed_file(filename):
@@ -80,7 +80,6 @@ def upldfile():
 
 @app.route('/convert', methods=['POST'])
 def convert():
-
     data = json.loads(request.get_data())
 
     model_full_name = data['name']
@@ -88,20 +87,22 @@ def convert():
     model_name = model_full_name.split('.')[0]
 
     save_dir =  os.path.join(save_base_dir,model_name)
-
     model_path = os.path.join(updir, model_full_name)
 
+    result = -1
     if model_full_name.split('.')[-1] == 'onnx':
         result = os.system('x2paddle'+' --framework=onnx'+' --model='+model_path+' --save_dir='+save_dir)
-        if result == 0 :
-            zip_dir = os.path.join(save_dir, model_name + '.tar.gz')
-            if os.path.exists(save_dir):
-                os.system('tar cvzf ' + zip_dir + ' -C ' + save_base_dir + ' ' + model_name)
-            return jsonify(name=model_name + '.tar.gz')
+    elif model_full_name.split('.')[-1] == 'pb':
+        result = os.system('x2paddle' + ' --framework=tensorflow' + ' --model=' + model_path + ' --save_dir=' + save_dir)
 
-        else:
-            return jsonify(name='convert failed')
+    if result == 0 :
+        zip_dir = os.path.join(save_dir, model_name + '.tar.gz')
+        if os.path.exists(save_dir):
+            os.system('tar cvzf ' + zip_dir + ' -C ' + save_base_dir + ' ' + model_name)
+        return jsonify(name=model_name + '.tar.gz')
 
+    else:
+        return jsonify(name='convert failed')
 
 @app.route('/download/<path:filename>', methods=['GET', 'POST'])
 def download(filename):
