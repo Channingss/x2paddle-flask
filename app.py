@@ -3,70 +3,71 @@ from flask import (
     request,
     render_template,
     send_from_directory,
-    url_for,
-    jsonify
+    jsonify,
+    session
 )
+import time
 from werkzeug.utils import secure_filename
 import os
-import  json
+import json
+from subprocess import Popen, PIPE, STDOUT
+import sys
+import logging
+from src.model import Model
+from src.database.connect import connect_es
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 save_base_dir = os.path.join(basedir, 'save_model/')
 
 app = Flask(__name__)
 
-from logging import Formatter, FileHandler
-handler = FileHandler(os.path.join(basedir, 'log.txt'), encoding='utf8')
-handler.setFormatter(
-    Formatter("[%(asctime)s] %(levelname)-8s %(message)s", "%Y-%m-%d %H:%M:%S")
-)
-app.logger.addHandler(handler)
-
-app.config['ALLOWED_EXTENSIONS'] = set(['onnx'])
-
+def initial_app(app):
+    handler = logging.FileHandler(os.path.join(basedir, 'x2paddle.log'), encoding='UTF-8')
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(
+        logging.Formatter("[%(asctime)s] %(levelname)-8s %(message)s", "%Y-%m-%d %H:%M:%S")
+    )
+    app.logger.name = 'x2paddle'
+    app.logger.addHandler(handler)
+    app.config['debug'] = True
+    app.config['SECRET_KEY'] = os.urandom(24)
+    app.config['ALLOWED_EXTENSIONS'] = set(['onnx','pb','caffemodel','prototxt'])
+    return app
 
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1] in app.config['ALLOWED_EXTENSIONS']
 
-@app.context_processor
-def override_url_for():
-    return dict(url_for=dated_url_for)
+def x2paddle(cmd, model_name, save_dir):
+    p = Popen(cmd, stdout=PIPE, stderr=STDOUT, shell=True, universal_newlines=True)
+    cmd_result = ''
+    for line in p.stdout.readlines():
+        cmd_result += str(line).rstrip() + '<br/>\n'
+        sys.stdout.flush()
+    zip_dir = os.path.join(save_dir, model_name + '.tar.gz')
 
+    es_model = Model.get(id=session['id'])
+    es_model.update(log=cmd_result)
 
-def dated_url_for(endpoint, **values):
-    if endpoint == 'js_static':
-        filename = values.get('filename', None)
-        if filename:
-            file_path = os.path.join(app.root_path,
-                                     'static/js', filename)
-            values['q'] = int(os.stat(file_path).st_mtime)
-    elif endpoint == 'css_static':
-        filename = values.get('filename', None)
-        if filename:
-            file_path = os.path.join(app.root_path,
-                                     'static/css', filename)
-            values['q'] = int(os.stat(file_path).st_mtime)
-    return url_for(endpoint, **values)
-
-
-@app.route('/css/<path:filename>')
-def css_static(filename):
-    return send_from_directory(app.root_path + '/static/css/', filename)
-
-
-@app.route('/js/<path:filename>')
-def js_static(filename):
-    return send_from_directory(app.root_path + '/static/js/', filename)
-
+    if os.path.exists(os.path.join(save_dir, 'inference_model/__model__')):
+        os.system('tar cvzf ' + zip_dir + ' -C ' + save_base_dir + ' ' + model_name)
+        return jsonify(name=model_name + '.tar.gz', status='success', cmd_result=cmd_result)
+    else:
+        return jsonify(name='', status='failed', cmd_result=cmd_result)
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+@app.route('/upload', methods=['POST'])
+def upload():
+    #获取用户ip地址
+    start_time = time.time()
+    id = str(start_time) + '_' + request.remote_addr
+    es_model = Model(meta={'id':id},ip=request.remote_addr)
+    es_model.save()
+    session['id'] = id
 
-@app.route('/uploadajax', methods=['POST'])
-def upldfile():
     if request.method == 'POST':
         files = request.files['file']
         if files and allowed_file(files.filename):
@@ -74,41 +75,85 @@ def upldfile():
             app.logger.info('FileName: ' + filename)
             updir = os.path.join(basedir, 'upload/')
             files.save(os.path.join(updir, filename))
-            file_size = os.path.getsize(os.path.join(updir, filename))
 
+            es_model = Model.get(id=session['id'])
+            es_model.update(models_dir=os.path.join(updir, filename))
+
+            file_size = os.path.getsize(os.path.join(updir, filename))
             return jsonify(name=filename, size=file_size)
 
 @app.route('/convert', methods=['POST'])
 def convert():
+    '''
+    {0:'tensorflow',1:'onnx',2:'caffe'}
+    :return:
+    '''
+    try:
+        id = session['id']
+    except:
+        return jsonify(name='', status='failed', cmd_result='')
+
     data = json.loads(request.get_data())
-
-    model_full_name = data['name']
     updir = os.path.join(basedir, 'upload/')
-    model_name = model_full_name.split('.')[0]
+    es_model = Model.get(id=id)
+    es_model.update(email=data['email'])
 
-    save_dir =  os.path.join(save_base_dir,model_name)
-    model_path = os.path.join(updir, model_full_name)
+    app.logger.warning('这是第一个info log')
 
-    result = -1
-    if model_full_name.split('.')[-1] == 'onnx':
-        result = os.system('x2paddle'+' --framework=onnx'+' --model='+model_path+' --save_dir='+save_dir)
-    elif model_full_name.split('.')[-1] == 'pb':
-        result = os.system('x2paddle' + ' --framework=tensorflow' + ' --model=' + model_path + ' --save_dir=' + save_dir)
-
-    if result == 0 :
-        zip_dir = os.path.join(save_dir, model_name + '.tar.gz')
-        if os.path.exists(save_dir):
-            os.system('tar cvzf ' + zip_dir + ' -C ' + save_base_dir + ' ' + model_name)
-        return jsonify(name=model_name + '.tar.gz')
-
+    if data['framework'] == '0':
+        #tensorflow
+        model_full_name = data['tf_name']
+        if model_full_name == '':
+            return jsonify(status='failed')
+        model_name = model_full_name.split('.')[0]
+        save_dir = os.path.join(save_base_dir, model_name)
+        model_path = os.path.join(updir, model_full_name)
+        cmd = 'x2paddle' + ' --framework=tensorflow' + ' --model=' + model_path + ' --save_dir=' + save_dir
+        return x2paddle(cmd, model_name, save_dir)
+    elif data['framework'] == '1':
+        #onnx
+        model_full_name = data['onnx_name']
+        if model_full_name == '':
+            return jsonify(status='failed')
+        model_name = model_full_name.split('.')[0]
+        save_dir = os.path.join(save_base_dir, model_name)
+        model_path = os.path.join(updir, model_full_name)
+        cmd = 'x2paddle' + ' --framework=onnx' + ' --model=' + model_path + ' --save_dir=' + save_dir
+        return x2paddle(cmd, model_name, save_dir)
     else:
-        return jsonify(name='convert failed')
+        # caffe
+        caffe_weight_name = data['caffe_weight_name']
+        caffe_model_name = data['caffe_model_name']
+        if caffe_weight_name == '' or caffe_model_name == '':
+            return jsonify(status='failed')
+        model_name = caffe_model_name.split('.')[0]
+        save_dir = os.path.join(save_base_dir, model_name)
+
+        weight_path = os.path.join(updir, caffe_weight_name)
+        model_path = os.path.join(updir, caffe_model_name)
+        cmd = 'x2paddle' + ' --framework=caffe' + ' --prototxt=' + model_path+ ' --weight=' + weight_path+ ' --save_dir=' + save_dir
+        return x2paddle(cmd, model_name, save_dir)
 
 @app.route('/download/<path:filename>', methods=['GET', 'POST'])
 def download(filename):
     filename = filename[:-7]+'/'+ filename
     return send_from_directory(directory=save_base_dir, filename=filename)
 
+@app.route('/testdata/<path:filename>', methods=['GET', 'POST'])
+def testdata(filename):
+    updir = os.path.join(basedir, 'upload/')
+    return send_from_directory(directory=updir, filename=filename)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    #connect es
+    config_dir= 'src/database/config.json'
+    try:
+        with open(config_dir) as f:
+            config = json.loads(f.read())
+            f.close()
+    except:
+        assert 'fail to load config: '+ config_dir
+    connect_es(config)
+
+    app = initial_app(app)
+    app.run()
