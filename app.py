@@ -13,7 +13,7 @@ import json
 from subprocess import Popen, PIPE, STDOUT
 import sys
 import logging
-from src.model import Model
+from src.models import Model
 from src.database.connect import connect_es
 
 basedir = os.path.abspath(os.path.dirname(__file__))
