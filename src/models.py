@@ -5,6 +5,7 @@ class Model(Document):
     email = Text()
     log = Text()
     model_dir = Text()
+    framework = Text()
     class Index:
         name = 'flask'
     def save(self, ** kwargs):
