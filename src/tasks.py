@@ -40,12 +40,10 @@ class UploadConsumer(threading.Thread):
   def run(self):
     while True:
         time.sleep(1)
-        self.app.logger.info('start upload')
         model = self.wait_queue.get()
+        self.app.logger.info('start upload')
         self.app.logger.info("%s is consuming. %s in the queue is consumed!" % (self.getName(),model.id))
-
         model.save()
-
         self.finish_queue.put(model)
         self.app.logger.info('upload success')
 
@@ -62,8 +60,6 @@ class ConvertConsumer(threading.Thread):
         model = self.wait_queue.get()
         self.app.logger.info('start convert')
         self.app.logger.info("%s is consuming. %s in the queue is consumed!" % (self.getName(), model.id))
-
         result = model.convert()
-
         self.finish_pool[model.id] = result
         self.app.logger.info('convert done')
