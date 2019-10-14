@@ -1,5 +1,10 @@
-a server of x2padde(based on flask)
-简介
+## a server of x2padde(based on flask)
+
+### 依赖
+- python包查看requirements.txt
+- elasticsearch数据库，自行安装
+
+### 简介
 - /src/ 路径下是后端和数据库的代码，其中包含一些测试代码
 - /app_v_1_0.py 处理web前端请求的服务（代码结构尚未整理）
 - /app.py 处理脚本请求的服务
