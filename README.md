@@ -14,3 +14,6 @@
 - /templates/ 前端页面
 - /upload/ 上传文件的存储路径
 - /save_model/ 完成转换文件的存储路径
+
+### 运行
+python app.py
