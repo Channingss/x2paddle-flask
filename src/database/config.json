@@ -4,7 +4,6 @@
     "user": "elastic",
     "password": "x2paddle",
     "index" : "flask",
-    "test_index": "test_index",
     "module_index": "_doc",
     "need_auth" : false,
     "auth_str" : "",

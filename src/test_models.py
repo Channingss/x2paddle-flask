@@ -27,8 +27,8 @@ connect_es(config)
 #     # print(h.ip)
 #     # print(h.models_dir)
 
-from model import Model
+from es_models import EsModel
 
-doc = Model.get(id='qx4lqm0BFSVlgUkK8Kob')
+doc = EsModel.get(id='qx4lqm0BFSVlgUkK8Kob')
 
 doc.update(ip='1111')

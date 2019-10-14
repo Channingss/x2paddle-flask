@@ -1,12 +1,155 @@
-from elasticsearch_dsl import  Document, Keyword ,Text,Ip
+import uuid
+import os
+from werkzeug.utils import secure_filename
+import sys
+from subprocess import Popen, PIPE, STDOUT
 
-class Model(Document):
-    ip= Text()
-    email = Text()
-    log = Text()
-    model_dir = Text()
-    framework = Text()
-    class Index:
-        name = 'flask'
-    def save(self, ** kwargs):
-        return super(Model, self).save(** kwargs)
+def run_script(cmd, model_name, save_base_dir):
+    p = Popen(cmd, stdout=PIPE, stderr=STDOUT, shell=True, universal_newlines=True)
+    cmd_result = ''
+    for line in p.stdout.readlines():
+        cmd_result += str(line).rstrip() + '<br/>\n'
+        sys.stdout.flush()
+
+    zip_dir = os.path.join(save_base_dir, model_name + '.tar.gz')
+    save_dir = os.path.join(save_base_dir, model_name)
+    print(save_dir)
+    print(zip_dir)
+    if os.path.exists(os.path.join(save_dir, 'inference_model/__model__')):
+        os.system('tar cvzf ' + zip_dir  +' '+ save_dir)
+        res = {'status':'success','cmd_result':cmd_result}
+        return res
+    else:
+        res = {'status': 'failed', 'cmd_result': cmd_result}
+        return res
+
+class Model():
+    def __init__(self, upload_base_dir, convert_base_dir, request):
+        self.id = uuid.uuid4().hex
+        self.framework = request.form.get('framework')
+        self.headers = request.headers
+        self.file = {'object': None,
+                           'upload_dir': '',
+                             'filename': '',
+                           'convert_dir': '',
+                           }
+        self.form = request.form
+        self.upload_base_dir = upload_base_dir
+        self.convert_base_dir = convert_base_dir
+
+    def check_filetype(self):
+        support_type = ['onnx', 'pb', 'caffemodel', 'prototxt']
+        if self.framework in ['tensorflow','onnx']:
+            return '.' in self.file['filename'] and \
+                   self.file['filename'].rsplit('.', 1)[1] in support_type
+
+class OnnxModel(Model):
+    def __init__(self, upload_base_dir, convert_base_dir, request):
+        super(OnnxModel,self).__init__(upload_base_dir, convert_base_dir, request)
+        self.resolve_files(request)
+
+    def resolve_files(self,request):
+        if 'onnx' in request.files:
+            obj = request.files['onnx']
+            self.file['object'] = obj
+            self.file['filename'] = obj.filename.split('.')[0]
+
+    def save(self):
+        updir = os.path.join(self.upload_base_dir, self.id)
+        if not os.path.exists(updir):
+            os.mkdir(updir)
+        file = self.file['object']
+        filename = secure_filename(file.filename)
+        file_dir = os.path.join(updir, filename)
+        file.save(file_dir)
+        self.file['upload_dir'] = file_dir
+
+    def convert(self):
+        filename = self.file['filename']
+        save_base_dir = os.path.join(self.convert_base_dir, self.id)
+        save_dir = os.path.join(self.convert_base_dir, self.id+'/'+filename)
+        cmd = 'x2paddle' + ' --framework=onnx' + ' --model=' + self.file['upload_dir']  + ' --save_dir=' + save_dir
+        return run_script(cmd, filename, save_base_dir)
+
+class TensorflowModel(Model):
+    def __init__(self, upload_base_dir, convert_base_dir, request):
+        super(TensorflowModel, self).__init__(upload_base_dir, convert_base_dir, request)
+        self.resolve_files(request)
+
+    def resolve_files(self,request):
+        if 'tensorflow' in request.files:
+            obj = request.files['tensorflow']
+            self.file['object'] = obj
+            self.file['filename'] = obj.filename.split('.')[0]
+
+    def save(self):
+        updir = os.path.join(self.upload_base_dir, self.id)
+        if not os.path.exists(updir):
+            os.mkdir(updir)
+        file = self.file['object']
+        filename = secure_filename(file.filename)
+        file_dir = os.path.join(updir, filename)
+        file.save(file_dir)
+        self.file['upload_dir'] = file_dir
+
+    def convert(self):
+        filename = self.file['filename']
+        save_base_dir = os.path.join(self.convert_base_dir, self.id)
+        save_dir = os.path.join(self.convert_base_dir, self.id+'/'+filename)
+        cmd = 'x2paddle' + ' --framework=tensorflow' + ' --model=' + self.file['upload_dir']  + ' --save_dir=' + save_dir
+        return run_script(cmd, filename, save_base_dir)
+
+class CaffeModel():
+    def __init__(self, upload_base_dir, convert_base_dir, request):
+        self.id = uuid.uuid4().hex
+        self.framework = request.form.get('framework')
+        self.headers = request.headers
+        self.upload_base_dir = upload_base_dir
+        self.convert_base_dir = convert_base_dir
+        self.files = {
+            'caffe_weight': {'object': None,
+                           'upload_dir': '',
+                             'filename': '',
+                           'convert_dir': '',
+                           },
+            'caffe_model': {'object': None,
+                             'upload_dir': '',
+                            'filename': '',
+                             'convert_dir': '',
+                             }}
+        self.form = request.form
+        self.resolve_files(request)
+
+    def resolve_files(self,request):
+        if 'caffe_weight' in request.files:
+            self.files['caffe_weight']['object'] = request.files['caffe_weight']
+        if 'caffe_model' in request.files:
+            self.files['caffe_model']['object'] = request.files['caffe_model']
+
+    def save(self):
+        updir = os.path.join(self.upload_base_dir, self.id)
+        if not os.path.exists(updir):
+            os.mkdir(updir)
+        caffe_weight = self.files['caffe_weight']['object']
+        caffe_model = self.files['caffe_model']['object']
+        caffe_weight_filename = secure_filename(caffe_weight.filename)
+        caffe_model_filename = secure_filename(caffe_model.filename)
+        caffe_weight_dir = os.path.join(updir, caffe_weight_filename)
+        caffe_model_dir = os.path.join(updir, caffe_model_filename)
+        caffe_weight.save(caffe_weight_dir)
+        self.files['caffe_weight']['upload_dir'] = caffe_weight_dir
+        caffe_model.save(caffe_model_dir)
+        self.files['caffe_model']['upload_dir'] = caffe_model_dir
+
+    def convert(self):
+        filename = self.files['caffe_model']['filename']
+        save_base_dir = os.path.join(self.convert_base_dir, self.id)
+        save_dir = os.path.join(self.convert_base_dir, self.id + '/' + filename)
+        weight_path = os.path.join(self.files['caffe_weight']['upload_dir'])
+        model_path = os.path.join(self.files['caffe_model']['upload_dir'])
+        cmd = 'x2paddle' + ' --framework=caffe' + ' --prototxt=' + model_path + ' --weight=' + weight_path + ' --save_dir=' + save_dir
+        return run_script(cmd, filename, save_base_dir)
+
+    def check_filetype(self):
+        caffe_weight_name = self.files['caffe_weight']['filename']
+        caffe_model_name = self.files['caffe_weight']['filename']
