@@ -50,8 +50,8 @@ def x2paddle():
     if request.method == 'POST':
         model = create_model(request)
         #
-        # if not model.check_filetype():
-        #     return jsonify(status='failed', message='filetype error')
+        if not model.check_filetype():
+            return jsonify(status='failed', message='filetype error')
 
         # initial database object
         es_model = EsModel(meta={'id': model.id}, ip=request.remote_addr)

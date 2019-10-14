@@ -39,9 +39,9 @@ class Model():
 
     def check_filetype(self):
         support_type = ['onnx', 'pb', 'caffemodel', 'prototxt']
-        if self.framework in ['tensorflow','onnx']:
-            return '.' in self.file['filename'] and \
-                   self.file['filename'].rsplit('.', 1)[1] in support_type
+
+        return '.' in self.file['object'].filename and \
+               self.file['object'].filename.rsplit('.', 1)[1] in support_type
 
 class OnnxModel(Model):
     def __init__(self, upload_base_dir, convert_base_dir, request):
@@ -151,5 +151,18 @@ class CaffeModel():
         return run_script(cmd, filename, save_base_dir)
 
     def check_filetype(self):
-        caffe_weight_name = self.files['caffe_weight']['filename']
-        caffe_model_name = self.files['caffe_weight']['filename']
+        weight_name = self.files['caffe_weight']['object'].filename
+        model_name = self.files['caffe_weight']['object'].filename
+
+        support_type = ['onnx', 'pb', 'caffemodel', 'prototxt']
+
+        valid_weight_name =  '.' in weight_name and \
+               weight_name.rsplit('.', 1)[1] in support_type
+
+        valid_model_name =  '.' in model_name and \
+               model_name.rsplit('.', 1)[1] in support_type
+
+        if valid_weight_name and valid_model_name:
+            return True
+
+        return False
