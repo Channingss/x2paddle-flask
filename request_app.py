@@ -45,9 +45,9 @@ class Request1(threading.Thread):
     threading.Thread.__init__(self)
   def run(self):
     file1 = {
-      "tensorflow": open("/Users/chenlingchi/Downloads/onet-18.pb", "rb")
+      "onnx": open("/Users/chenlingchi/Documents/person_git/X2Paddle/onnx_model_supported/classification/mobilenet_v2.onnx", "rb")
     }
-    r1 = requests.post('http://127.0.0.1:5000/x2paddle', files=file1, data={'framework': 'tensorflow'})
+    r1 = requests.post('http://127.0.0.1:5000/x2paddle', files=file1, data={'framework': 'onnx'})
     print(self.name, r1.json())
 
 if __name__ == '__main__':
@@ -56,7 +56,7 @@ if __name__ == '__main__':
   request3 = Request3()
   request4 = Request4()
   request5 = Request5()
-  request2.start()
+  request1.start()
   # request1.start()
   # request4.start()
   # request3.start()

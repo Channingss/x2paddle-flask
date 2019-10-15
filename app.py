@@ -39,7 +39,7 @@ def create_app(app):
 def create_model(request):
     if request.form.get('framework') == 'tensorflow':
         model = TensorflowModel(upload_base_dir, convert_base_dir, request)
-    elif request.form.get('onnx') == 'tensorflow':
+    elif request.form.get('framework') == 'onnx':
         model = OnnxModel(upload_base_dir, convert_base_dir, request)
     else:
         model = CaffeModel(upload_base_dir, convert_base_dir, request)
