@@ -1,6 +1,8 @@
 import json
 from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl import Search
+
+
 # Define a default Elasticsearch client
 def connect_es(config):
     try:
@@ -12,6 +14,7 @@ def connect_es(config):
     except:
         assert False, 'create connect to database error!!'
 
+
 with open('config.json') as f:
     config = json.loads(f.read())
     f.close()
@@ -19,7 +22,7 @@ connect_es(config)
 
 s = Search(index='flask').query("match_all")
 for idx, h in enumerate(s.execute().hits):
-    print("-------"+str(idx)+"--------")
+    print("-------" + str(idx) + "--------")
     print(h)
     # print(h.meta.id)
     print(h.email)
