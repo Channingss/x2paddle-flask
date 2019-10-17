@@ -1,11 +1,5 @@
-from flask import (
-    Flask,
-    request,
-    render_template,
-    send_from_directory,
-    jsonify,
-    session
-)
+from flask import (Flask, request, render_template, send_from_directory,
+                   jsonify, session)
 import os
 import json
 import logging
@@ -25,25 +19,32 @@ convert_base_dir = os.path.join(base_dir, 'save_model/')
 
 app = Flask(__name__)
 
+
 def create_app(app):
     app.debug = True
     app.config['SECRET_KEY'] = os.urandom(24)
     handler = logging.FileHandler('x2paddle.log', encoding='UTF-8')
     handler.setLevel(logging.DEBUG)
-    format = logging.Formatter("[%(asctime)s] %(levelname)-8s %(message)s", "%Y-%m-%d %H:%M:%S")
+    format = logging.Formatter("[%(asctime)s] %(levelname)-8s %(message)s",
+                               "%Y-%m-%d %H:%M:%S")
     handler.setFormatter(format)
     app.logger.name = 'x2paddle'
     app.logger.addHandler(handler)
     return app
+
 
 def create_model(request):
     if request.form.get('framework') == 'tensorflow':
         model = TensorflowModel(upload_base_dir, convert_base_dir, request)
     elif request.form.get('framework') == 'onnx':
         model = OnnxModel(upload_base_dir, convert_base_dir, request)
-    else:
+    elif request.form.get('framework') == 'caffe':
         model = CaffeModel(upload_base_dir, convert_base_dir, request)
+    # In the future, paddle2onnx may be supported
+    # else:
+    #     pass
     return model
+
 
 @app.route('/x2paddle', methods=['POST'])
 def x2paddle():
@@ -67,30 +68,34 @@ def x2paddle():
         else:
             return jsonify(name=model.id, status='failed', message='waiting')
 
+
 @app.route('/download/<path:filename>', methods=['GET', 'POST'])
 def download(filename):
-    filename = filename[:-7]+'/'+ filename
+    filename = filename[:-7] + '/' + filename
     return send_from_directory(directory=convert_base_dir, filename=filename)
+
 
 if __name__ == '__main__':
     #connect es
-    config_dir= 'src/database/config.json'
+    config_dir = 'src/database/config.json'
     try:
         with open(config_dir) as f:
             config = json.loads(f.read())
             f.close()
     except:
-        assert 'fail to load config: '+ config_dir
+        assert 'fail to load config: ' + config_dir
     connect_es(config)
 
     #initial server
     app = create_app(app)
 
     #create consumer
-    uploadConsumer  = UploadConsumer('uploadConsumer', uploading_queue, uploaded_queue, app)
+    uploadConsumer = UploadConsumer('uploadConsumer', uploading_queue,
+                                    uploaded_queue, app)
     uploadConsumer.start()
 
-    convertConsumer  = ConvertConsumer('convertConsumer', uploaded_queue, converted_pool, app)
+    convertConsumer = ConvertConsumer('convertConsumer', uploaded_queue,
+                                      converted_pool, app)
     convertConsumer.start()
 
     app.run(host='0.0.0.0')
