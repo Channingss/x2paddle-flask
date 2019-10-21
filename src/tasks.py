@@ -1,17 +1,18 @@
-import threading,time
+import threading, time
 threading.stack_size(65536)
+
 
 class Producer(threading.Thread):
     def __init__(self, name, wait_queue, finish_pool, app):
+        threading.Thread.__init__(self, name=name)
         self.id = None
         self.wait_queue = wait_queue
         self.finish_pool = finish_pool
-        threading.Thread.__init__(self, name=name)
-        self.daemon=True
+        self.daemon = True
         self.result = None
         self.app = app
 
-    def add_task(self,model):
+    def add_task(self, model):
         print("producing %s to the queue!" % (model.id))
         self.id = model.id
         if self.wait_queue.full():
@@ -29,37 +30,44 @@ class Producer(threading.Thread):
                 self.app.logger.info(self.id + ' producer get ack success')
                 break
 
-class UploadConsumer(threading.Thread):
-  def __init__(self, name, wait_queue, finish_queue,app):
-    threading.Thread.__init__(self, name=name)
-    self.wait_queue = wait_queue
-    self.finish_queue = finish_queue
-    self.daemon = True
-    self.app = app
 
-  def run(self):
-    while True:
-        time.sleep(1)
-        model = self.wait_queue.get()
-        self.app.logger.info('start upload')
-        self.app.logger.info("%s is consuming. %s in the queue is consumed!" % (self.getName(),model.id))
-        model.save()
-        self.finish_queue.put(model)
-        self.app.logger.info('upload success')
+class UploadConsumer(threading.Thread):
+    def __init__(self, name, wait_queue, finish_queue, app):
+        threading.Thread.__init__(self, name=name)
+        self.wait_queue = wait_queue
+        self.finish_queue = finish_queue
+        self.daemon = True
+        self.app = app
+
+    def run(self):
+        while True:
+            time.sleep(1)
+            model = self.wait_queue.get()
+            self.app.logger.info('start upload')
+            self.app.logger.info(
+                "%s is consuming. %s in the queue is consumed!" %
+                (self.getName(), model.id))
+            model.save()
+            self.finish_queue.put(model)
+            self.app.logger.info('upload success')
+
 
 class ConvertConsumer(threading.Thread):
-  def __init__(self, name, wait_queue, finish_pool, app):
-    threading.Thread.__init__(self, name=name)
-    self.wait_queue = wait_queue
-    self.finish_pool = finish_pool
-    self.daemon = True
-    self.app = app
-  def run(self):
-    while True:
-        time.sleep(1)
-        model = self.wait_queue.get()
-        self.app.logger.info('start convert')
-        self.app.logger.info("%s is consuming. %s in the queue is consumed!" % (self.getName(), model.id))
-        result = model.convert()
-        self.finish_pool[model.id] = result
-        self.app.logger.info('convert done')
+    def __init__(self, name, wait_queue, finish_pool, app):
+        threading.Thread.__init__(self, name=name)
+        self.wait_queue = wait_queue
+        self.finish_pool = finish_pool
+        self.daemon = True
+        self.app = app
+
+    def run(self):
+        while True:
+            time.sleep(1)
+            model = self.wait_queue.get()
+            self.app.logger.info('start convert')
+            self.app.logger.info(
+                "%s is consuming. %s in the queue is consumed!" %
+                (self.getName(), model.id))
+            result = model.convert()
+            self.finish_pool[model.id] = result
+            self.app.logger.info('convert done')

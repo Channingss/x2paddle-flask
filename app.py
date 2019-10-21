@@ -7,8 +7,8 @@ from src.es_models import EsModel
 from src.database.connect import connect_es
 from src.models import TensorflowModel, CaffeModel, OnnxModel
 from src.tasks import ConvertConsumer, UploadConsumer, Producer
-
 import queue
+
 uploading_queue = queue.Queue(maxsize=2)
 uploaded_queue = queue.Queue(maxsize=100)
 converted_pool = dict()
