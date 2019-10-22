@@ -183,7 +183,4 @@ class CaffeModel():
         valid_model_name = '.' in model_name and model_name.split(
             '.')[-1] in caffe_model_support_type
 
-        if valid_weight_name and valid_model_name:
-            return True
-
-        return False
+        return valid_weight_name and valid_model_name
