@@ -2,13 +2,27 @@ import requests
 import threading
 
 
+class Request1(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        file1 = {
+            "onnx": open("/Users/mamingjie/Downloads/mobilenet_v2.onnx", "rb")
+        }
+        r1 = requests.post('http://127.0.0.1:5000/x2paddle',
+                           files=file1,
+                           data={'framework': 'onnx'})
+        print(self.name, r1.json())
+
+
 class Request2(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
 
     def run(self):
         file1 = {
-            "tensorflow": open("/Users/chenlingchi/Downloads/onet-18.pb", "rb")
+            "tensorflow": open("/Users/mamingjie/Downloads/onet-18.pb", "rb")
         }
         r1 = requests.post('http://127.0.0.1:5000/x2paddle',
                            files=file1,
@@ -22,7 +36,7 @@ class Request3(threading.Thread):
 
     def run(self):
         file1 = {
-            "tensorflow": open("/Users/chenlingchi/Downloads/onet-18.pb", "rb")
+            "tensorflow": open("/Users/mamingjie/Downloads/pnet-18.pb", "rb")
         }
         r1 = requests.post('http://127.0.0.1:5000/x2paddle',
                            files=file1,
@@ -50,7 +64,7 @@ class Request5(threading.Thread):
 
     def run(self):
         file1 = {
-            "tensorflow": open("/Users/chenlingchi/Downloads/onet-18.pb", "rb")
+            "tensorflow": open("/Users/mamingjie/Downloads/onet-18.pb", "rb")
         }
         r1 = requests.post('http://127.0.0.1:5000/x2paddle',
                            files=file1,
@@ -58,33 +72,16 @@ class Request5(threading.Thread):
         print(self.name, r1.json())
 
 
-class Request1(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-
-    def run(self):
-        file1 = {
-            "onnx":
-            open(
-                "/Users/chenlingchi/Documents/person_git/X2Paddle/onnx_model_supported/classification/mobilenet_v2.onnx",
-                "rb")
-        }
-        r1 = requests.post('http://127.0.0.1:5000/x2paddle',
-                           files=file1,
-                           data={'framework': 'onnx'})
-        print(self.name, r1.json())
-
-
 if __name__ == '__main__':
-    # request1 = Request1()
-    # request2 = Request2()
-    # request3 = Request3()
-    request4 = Request4()
+    request1 = Request1()
+    request2 = Request2()
+    request3 = Request3()
+    # request4 = Request4()
     # request5 = Request5()
-    request4.start()
-    # request1.start()
+    request1.start()
+    request2.start()
+    request3.start()
     # request4.start()
-    # request3.start()
     # request5.start()
 
     # request2.join()
