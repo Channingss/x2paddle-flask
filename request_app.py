@@ -36,11 +36,14 @@ class Request3(threading.Thread):
 
     def run(self):
         file1 = {
-            "tensorflow": open("/Users/mamingjie/Downloads/pnet-18.pb", "rb")
+            "caffe_weight":
+            open("/Users/mamingjie/Downloads/bvlc_alexnet.caffemodel", "rb"),
+            "caffe_model":
+            open("/Users/mamingjie/Downloads/alexnet.prototxt", "rb")
         }
         r1 = requests.post('http://127.0.0.1:5000/x2paddle',
                            files=file1,
-                           data={'framework': 'tensorflow'})
+                           data={'framework': 'caffe'})
         print(self.name, r1.json())
 
 
