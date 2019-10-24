@@ -23,14 +23,26 @@
     </div>
   </div>
 
+    <div class="layui-form-item">
+    <label class="layui-form-label">模型类型</label>
+    <div class="layui-input-block">
+      <select name="model_class" lay-verify="required" lay-filter="filter">
+        <option value=""></option>
+        <option value="3">图像识别</option>
+        <option value="4">图像分割</option>
+        <option value="5">图像分类</option>
+      </select>
+    </div>
+  </div>
+
   <div class="layui-form-item">
     <label class="layui-form-label">转换格式</label>
     <div class="layui-input-block">
       <select name="framework" lay-verify="required" lay-filter="filter">
         <option value=""></option>
-        <option value="0">tensorflow</option>
-        <option value="1">onnx</option>
-        <option value="2">caffe</option>
+        <option value="0">TensorFlow</option>
+        <option value="1">ONNX</option>
+        <option value="2">Caffe</option>
       </select>
     </div>
   </div>
