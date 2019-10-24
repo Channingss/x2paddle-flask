@@ -182,7 +182,8 @@ class CaffeModel():
         save_dir = self.files['caffe_model']['save_dir']
         weight_path = os.path.join(self.files['caffe_weight']['upload_dir'])
         model_path = os.path.join(self.files['caffe_model']['upload_dir'])
-        cmd = 'x2paddle' + ' --framework=caffe' + ' --prototxt=' + model_path + ' --weight=' + weight_path + ' --save_dir=' + save_dir
+        cmd = 'x2paddle' + ' --framework=caffe' + ' --prototxt=' + model_path + \
+            ' --weight=' + weight_path + ' --save_dir=' + save_dir
         return run_script(cmd, filename, save_base_dir)
 
     def check_filetype(self):
