@@ -8,9 +8,10 @@ import sys
 import logging
 from src.es_models import EsModel
 from src.database.connect import connect_es
+import uuid
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-save_base_dir = os.path.join(basedir, 'save_model/')
+convert_base_dir = os.path.join(basedir, 'save_model/')
 
 app = Flask(__name__)
 
@@ -36,7 +37,10 @@ def check_file_extension(filename):
         '.')[-1] in app.config['ALLOWED_EXTENSIONS']
 
 
-def x2paddle(cmd, model_name, save_dir):
+def x2paddle(cmd, model_name, save_base_dir):
+    print(save_base_dir, 1116666)
+    save_dir = os.path.join(save_base_dir, model_name)
+    print(save_dir, 66661111)
     p = Popen(cmd,
               stdout=PIPE,
               stderr=STDOUT,
@@ -47,19 +51,24 @@ def x2paddle(cmd, model_name, save_dir):
         cmd_result += str(line).rstrip() + '<br/>\n'
         sys.stdout.flush()
     zip_dir = os.path.join(save_dir, model_name + '.tar.gz')
-
+    zip_dir = save_dir + '.tar.gz'
+    #    zip_dir = model_name + '.tar.gz'
     es_model = EsModel.get(id=session.get('id'))
     es_model.update(log=cmd_result)
 
     if os.path.exists(os.path.join(save_dir, 'inference_model/__model__')):
-        os.system('tar zcvf ' + zip_dir + ' -C ' + save_base_dir + ' ' +
+        print(save_dir, 111222333)
+        print(zip_dir, 5555444433332211)
+        print(convert_base_dir, 222233333)
+        print(model_name, 33332222)
+        os.system('tar -C ' + save_base_dir + ' -zcvf ' + zip_dir + ' ' +
                   model_name)
-        app.logger.info('convert success')
+        app.logger.info(model_name + ' convert success')
         return jsonify(name=model_name + '.tar.gz',
                        status='success',
                        cmd_result=cmd_result)
     else:
-        app.logger.info('convert failed')
+        app.logger.info(model_name + ' convert failed')
         return jsonify(name='', status='failed', cmd_result=cmd_result)
 
 
@@ -81,7 +90,9 @@ class Producer(threading.Thread):
     def add_task(self, file):
         print("%s is producing %s to the queue!" %
               (threading.current_thread(), file.filename))
-        self.id = file.filename
+        # self.id = file.filename
+        self.id = session.get('id')
+        print(self.id, 444444)
         message = (self.id, file)
         if self.wait_queue.full():
             return False
@@ -107,11 +118,15 @@ class Consumer(threading.Thread):
     def run(self):
         while True:
             id, file = self.wait_queue.get()
+            print(file, 555544441111)
             print("%s is consuming. %s in the queue is consumed!" %
                   (self.getName(), file.filename))
             filename = secure_filename(file.filename)
             app.logger.info('FileName: ' + filename)
             updir = os.path.join(basedir, 'upload/')
+            updir = os.path.join(updir, id)
+            if not os.path.exists(updir):
+                os.mkdir(updir)
             file.save(os.path.join(updir, filename))
             self.finish_queue.put(id)
             app.logger.info('upload success')
@@ -128,7 +143,9 @@ def upload():
     #获取用户ip地址
     app.logger.info('start upload')
     start_time = time.time()
-    id = str(start_time) + '_' + request.remote_addr
+    # id = str(start_time) + '_' + request.remote_addr
+    id = uuid.uuid4().hex
+    print(id, 55555555555)
     es_model = EsModel(meta={'id': id}, ip=request.remote_addr)
     es_model.save()
     session['id'] = id
@@ -144,6 +161,8 @@ def upload():
                 return jsonify(name=file.filename, status='waited')
             print(threading.enumerate())
             updir = os.path.join(basedir, 'upload/')
+            updir = os.path.join(updir, id)
+            print(updir, 222211111)
             es_model = EsModel.get(id=session.get('id'))
             es_model.update(models_dir=os.path.join(updir, file.filename))
             return jsonify(name=file.filename, status='success')
@@ -155,11 +174,13 @@ def convert():
     {0:'tensorflow',1:'onnx',2:'caffe'}
     :return:
     '''
-    print(request.get_data())
+    print(request.get_data(), 123456)
     data = json.loads(request.get_data().decode('utf-8'))
 
     id = session.get('id')
+    print(id, 654321)
     updir = os.path.join(basedir, 'upload/')
+    updir = os.path.join(updir, id)
     es_model = EsModel.get(id=id)
     es_model.update(email=data['email'])
     es_model.update(framework=data['framework'])
@@ -170,23 +191,25 @@ def convert():
         model_full_name = data['tf_name']
         if model_full_name == '':
             return jsonify(status='failed')
+        save_base_dir = os.path.join(convert_base_dir, id)
         model_name = model_full_name.split('.')[0]
         save_dir = os.path.join(save_base_dir, model_name)
         model_path = os.path.join(updir, model_full_name)
         cmd = 'x2paddle' + ' --framework=tensorflow' + ' --model=' + model_path + ' --save_dir=' + save_dir
-        return x2paddle(cmd, model_name, save_dir)
+        return x2paddle(cmd, model_name, save_base_dir)
 
     elif data['framework'] == '1':
         #onnx
         model_full_name = data['onnx_name']
         if model_full_name == '':
             return jsonify(status='failed')
+        save_base_dir = os.path.join(convert_base_dir, id)
         model_name = model_full_name.split('.')[0]
         save_dir = os.path.join(save_base_dir, model_name)
         model_path = os.path.join(updir, model_full_name)
         cmd = 'x2paddle' + ' --framework=onnx' + ' --model=' + model_path + ' --save_dir=' + save_dir
 
-        return x2paddle(cmd, model_name, save_dir)
+        return x2paddle(cmd, model_name, save_base_dir)
 
     elif data['framework'] == '1':
         # caffe
@@ -194,13 +217,14 @@ def convert():
         caffe_model_name = data['caffe_model_name']
         if caffe_weight_name == '' or caffe_model_name == '':
             return jsonify(status='failed')
+        save_base_dir = os.path.join(convert_base_dir, id)
         model_name = caffe_model_name.split('.')[0]
         save_dir = os.path.join(save_base_dir, model_name)
         weight_path = os.path.join(updir, caffe_weight_name)
         model_path = os.path.join(updir, caffe_model_name)
         cmd = 'x2paddle' + ' --framework=caffe' + ' --prototxt=' + model_path + ' --weight=' + weight_path + ' --save_dir=' + save_dir
 
-        return x2paddle(cmd, model_name, save_dir)
+        return x2paddle(cmd, model_name, save_base_dir)
 
 
 @app.route('/download/<path:filename>', methods=['GET', 'POST'])

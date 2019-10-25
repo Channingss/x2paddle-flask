@@ -77,13 +77,13 @@ class Request5(threading.Thread):
 
 if __name__ == '__main__':
     request1 = Request1()
-    request2 = Request2()
-    request3 = Request3()
+    # request2 = Request2()
+    # request3 = Request3()
     # request4 = Request4()
     # request5 = Request5()
     request1.start()
-    request2.start()
-    request3.start()
+    # request2.start()
+    # request3.start()
     # request4.start()
     # request5.start()
 

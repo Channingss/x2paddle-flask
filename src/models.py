@@ -18,8 +18,8 @@ def run_script(cmd, model_name, save_base_dir):
 
     zip_dir = os.path.join(save_base_dir, model_name + '.tar.gz')
     save_dir = os.path.join(save_base_dir, model_name)
-    print(save_dir)
-    print(zip_dir)
+    print(save_dir, 222233334444)
+    print(zip_dir, 555566667777)
     if os.path.exists(os.path.join(save_dir, 'inference_model/__model__')):
         os.system('tar cvzf ' + zip_dir + ' ' + save_dir)
         res = {'status': 'success', 'cmd_result': cmd_result}
