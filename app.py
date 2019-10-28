@@ -1,5 +1,6 @@
 from flask import (Flask, request, render_template, send_from_directory,
                    jsonify, session)
+from werkzeug.utils import secure_filename
 import os
 import json
 import logging

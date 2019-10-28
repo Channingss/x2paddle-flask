@@ -21,7 +21,6 @@ def initial_app(app):
     app.config['SECRET_KEY'] = os.urandom(24)
     app.config['ALLOWED_EXTENSIONS'] = set(
         ['onnx', 'pb', 'caffemodel', 'prototxt', 'pt', 'proto'])
-
     handler = logging.FileHandler('x2paddle.log', encoding='UTF-8')
     handler.setLevel(logging.DEBUG)
     format = logging.Formatter("[%(asctime)s] %(levelname)-8s %(message)s",
@@ -38,9 +37,7 @@ def check_file_extension(filename):
 
 
 def x2paddle(cmd, model_name, save_base_dir):
-    print(save_base_dir, 1116666)
     save_dir = os.path.join(save_base_dir, model_name)
-    print(save_dir, 66661111)
     p = Popen(cmd,
               stdout=PIPE,
               stderr=STDOUT,
@@ -48,19 +45,17 @@ def x2paddle(cmd, model_name, save_base_dir):
               universal_newlines=True)
     cmd_result = ''
     for line in p.stdout.readlines():
+        if 'Converting node' in line:
+            continue
         cmd_result += str(line).rstrip() + '<br/>\n'
         sys.stdout.flush()
-    zip_dir = os.path.join(save_dir, model_name + '.tar.gz')
+    # zip_dir = os.path.join(save_dir, model_name + '.tar.gz')
     zip_dir = save_dir + '.tar.gz'
     #    zip_dir = model_name + '.tar.gz'
     es_model = EsModel.get(id=session.get('id'))
     es_model.update(log=cmd_result)
 
     if os.path.exists(os.path.join(save_dir, 'inference_model/__model__')):
-        print(save_dir, 111222333)
-        print(zip_dir, 5555444433332211)
-        print(convert_base_dir, 222233333)
-        print(model_name, 33332222)
         os.system('tar -C ' + save_base_dir + ' -zcvf ' + zip_dir + ' ' +
                   model_name)
         app.logger.info(model_name + ' convert success')
@@ -80,19 +75,19 @@ uploaded_queue = queue.Queue(maxsize=100)
 
 
 class Producer(threading.Thread):
-    def __init__(self, name, wait_queue, finish_queue):
+    def __init__(self, name, wait_queue, finish_queue, app):
         self.id = None
         self.wait_queue = wait_queue
         self.finish_queue = finish_queue
         threading.Thread.__init__(self, name=name)
         self.daemon = True
+        self.app = app
 
     def add_task(self, file):
         print("%s is producing %s to the queue!" %
               (threading.current_thread(), file.filename))
         # self.id = file.filename
         self.id = session.get('id')
-        print(self.id, 444444)
         message = (self.id, file)
         if self.wait_queue.full():
             return False
@@ -118,7 +113,6 @@ class Consumer(threading.Thread):
     def run(self):
         while True:
             id, file = self.wait_queue.get()
-            print(file, 555544441111)
             print("%s is consuming. %s in the queue is consumed!" %
                   (self.getName(), file.filename))
             filename = secure_filename(file.filename)
@@ -145,7 +139,6 @@ def upload():
     start_time = time.time()
     # id = str(start_time) + '_' + request.remote_addr
     id = uuid.uuid4().hex
-    print(id, 55555555555)
     es_model = EsModel(meta={'id': id}, ip=request.remote_addr)
     es_model.save()
     session['id'] = id
@@ -153,7 +146,8 @@ def upload():
         file = request.files['file']
         if file and check_file_extension(file.filename):
             app.logger.info('file type is allow')
-            producer = Producer('Producer', uploading_queue, uploaded_queue)
+            producer = Producer('Producer', uploading_queue, uploaded_queue,
+                                app)
             if producer.add_task(file):
                 producer.start()
                 producer.join()
@@ -162,7 +156,6 @@ def upload():
             print(threading.enumerate())
             updir = os.path.join(basedir, 'upload/')
             updir = os.path.join(updir, id)
-            print(updir, 222211111)
             es_model = EsModel.get(id=session.get('id'))
             es_model.update(models_dir=os.path.join(updir, file.filename))
             return jsonify(name=file.filename, status='success')
@@ -178,7 +171,6 @@ def convert():
     data = json.loads(request.get_data().decode('utf-8'))
 
     id = session.get('id')
-    print(id, 654321)
     updir = os.path.join(basedir, 'upload/')
     updir = os.path.join(updir, id)
     es_model = EsModel.get(id=id)
@@ -208,7 +200,6 @@ def convert():
         save_dir = os.path.join(save_base_dir, model_name)
         model_path = os.path.join(updir, model_full_name)
         cmd = 'x2paddle' + ' --framework=onnx' + ' --model=' + model_path + ' --save_dir=' + save_dir
-
         return x2paddle(cmd, model_name, save_base_dir)
 
     elif data['framework'] == '1':
@@ -229,8 +220,10 @@ def convert():
 
 @app.route('/download/<path:filename>', methods=['GET', 'POST'])
 def download(filename):
-    filename = filename[:-7] + '/' + filename
-    return send_from_directory(directory=save_base_dir, filename=filename)
+    #    filename = filename[:-7] + '/' + filename
+    id = session.get('id')
+    download_dir = os.path.join(convert_base_dir, id)
+    return send_from_directory(directory=download_dir, filename=filename)
 
 
 @app.route('/testdata/<path:filename>', methods=['GET', 'POST'])
