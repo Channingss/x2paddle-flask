@@ -10,7 +10,7 @@ layui.use('form', function(){
   //监听提交
     form.on('submit(form)', function(data){
     var is_ready = true;
-    if(data.field.framework== 0 && tf_name == ''){
+    if(data.field.framework == 0 && tf_name == ''){
         layer.msg('请上传.pb文件');
         is_ready = false;
     }
@@ -19,15 +19,15 @@ layui.use('form', function(){
         is_ready = false;
     }
     if(data.field.framework == 2 ){
-        if (caffe_model_name=='' && caffe_weight_name ==''){
+        if (caffe_model_name == '' && caffe_weight_name ==''){
             layer.msg('请上传.prototxt和.caffemodel文件');
             is_ready = false;
         }
-        else if(caffe_model_name==''){
+        else if(caffe_model_name == ''){
             layer.msg('请上传.prototxt文件');
             is_ready = false;
         }
-        else if(caffe_weight_name==''){
+        else if(caffe_weight_name == ''){
             layer.msg('请上传.caffemodel文件');
             is_ready = false;
         }
@@ -165,4 +165,4 @@ layui.use('upload', function(){
     }
   });
 })
-}); 
+});

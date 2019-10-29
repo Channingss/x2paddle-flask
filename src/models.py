@@ -4,8 +4,13 @@ from werkzeug.utils import secure_filename
 import sys
 from subprocess import Popen, PIPE, STDOUT
 
+
 def run_script(cmd, model_name, save_base_dir):
-    p = Popen(cmd, stdout=PIPE, stderr=STDOUT, shell=True, universal_newlines=True)
+    p = Popen(cmd,
+              stdout=PIPE,
+              stderr=STDOUT,
+              shell=True,
+              universal_newlines=True)
     cmd_result = ''
     for line in p.stdout.readlines():
         cmd_result += str(line).rstrip() + '<br/>\n'
@@ -13,42 +18,45 @@ def run_script(cmd, model_name, save_base_dir):
 
     zip_dir = os.path.join(save_base_dir, model_name + '.tar.gz')
     save_dir = os.path.join(save_base_dir, model_name)
-    print(save_dir)
-    print(zip_dir)
     if os.path.exists(os.path.join(save_dir, 'inference_model/__model__')):
-        os.system('tar cvzf ' + zip_dir  +' '+ save_dir)
-        res = {'status':'success','cmd_result':cmd_result}
+        os.system('tar -C ' + save_base_dir + ' -cvzf ' + zip_dir + ' ' +
+                  model_name)
+        res = {'status': 'success', 'cmd_result': cmd_result}
         return res
     else:
         res = {'status': 'failed', 'cmd_result': cmd_result}
         return res
+
 
 class Model():
     def __init__(self, upload_base_dir, convert_base_dir, request):
         self.id = uuid.uuid4().hex
         self.framework = request.form.get('framework')
         self.headers = request.headers
-        self.file = {'object': None,
-                           'upload_dir': '',
-                             'filename': '',
-                           'convert_dir': '',
-                           }
+        self.file = {
+            'object': None,
+            'upload_dir': '',
+            'filename': '',
+            'save_dir': '',
+        }
         self.form = request.form
         self.upload_base_dir = upload_base_dir
         self.convert_base_dir = convert_base_dir
 
     def check_filetype(self):
-        support_type = ['onnx', 'pb', 'caffemodel', 'prototxt']
+        support_type = ['onnx', 'pb', 'caffemodel', 'prototxt', 'proto', 'pt']
 
-        return '.' in self.file['object'].filename and \
-               self.file['object'].filename.rsplit('.', 1)[1] in support_type
+        return '.' in self.file['object'].filename and self.file[
+            'object'].filename.split('.')[-1] in support_type
+
 
 class OnnxModel(Model):
     def __init__(self, upload_base_dir, convert_base_dir, request):
-        super(OnnxModel,self).__init__(upload_base_dir, convert_base_dir, request)
+        super(OnnxModel, self).__init__(upload_base_dir, convert_base_dir,
+                                        request)
         self.resolve_files(request)
 
-    def resolve_files(self,request):
+    def resolve_files(self, request):
         if 'onnx' in request.files:
             obj = request.files['onnx']
             self.file['object'] = obj
@@ -63,20 +71,28 @@ class OnnxModel(Model):
         file_dir = os.path.join(updir, filename)
         file.save(file_dir)
         self.file['upload_dir'] = file_dir
+        save_base_dir = os.path.join(self.convert_base_dir, self.id)
+        save_dir = os.path.join(save_base_dir + '/' + self.file['filename'])
+        self.file['save_dir'] = save_dir
 
     def convert(self):
         filename = self.file['filename']
         save_base_dir = os.path.join(self.convert_base_dir, self.id)
-        save_dir = os.path.join(self.convert_base_dir, self.id+'/'+filename)
-        cmd = 'x2paddle' + ' --framework=onnx' + ' --model=' + self.file['upload_dir']  + ' --save_dir=' + save_dir
+        # save_dir = os.path.join(self.convert_base_dir,
+        #                         self.id + '/' + filename)
+        save_dir = self.file['save_dir']
+        cmd = 'x2paddle' + ' --framework=onnx' + ' --model=' + self.file[
+            'upload_dir'] + ' --save_dir=' + save_dir
         return run_script(cmd, filename, save_base_dir)
+
 
 class TensorflowModel(Model):
     def __init__(self, upload_base_dir, convert_base_dir, request):
-        super(TensorflowModel, self).__init__(upload_base_dir, convert_base_dir, request)
+        super(TensorflowModel, self).__init__(upload_base_dir,
+                                              convert_base_dir, request)
         self.resolve_files(request)
 
-    def resolve_files(self,request):
+    def resolve_files(self, request):
         if 'tensorflow' in request.files:
             obj = request.files['tensorflow']
             self.file['object'] = obj
@@ -91,13 +107,18 @@ class TensorflowModel(Model):
         file_dir = os.path.join(updir, filename)
         file.save(file_dir)
         self.file['upload_dir'] = file_dir
+        save_base_dir = os.path.join(self.convert_base_dir, self.id)
+        save_dir = os.path.join(save_base_dir + '/' + self.file['filename'])
+        self.file['save_dir'] = save_dir
 
     def convert(self):
         filename = self.file['filename']
         save_base_dir = os.path.join(self.convert_base_dir, self.id)
-        save_dir = os.path.join(self.convert_base_dir, self.id+'/'+filename)
-        cmd = 'x2paddle' + ' --framework=tensorflow' + ' --model=' + self.file['upload_dir']  + ' --save_dir=' + save_dir
+        save_dir = self.file['save_dir']
+        cmd = 'x2paddle' + ' --framework=tensorflow' + ' --model=' + self.file[
+            'upload_dir'] + ' --save_dir=' + save_dir
         return run_script(cmd, filename, save_base_dir)
+
 
 class CaffeModel():
     def __init__(self, upload_base_dir, convert_base_dir, request):
@@ -107,24 +128,32 @@ class CaffeModel():
         self.upload_base_dir = upload_base_dir
         self.convert_base_dir = convert_base_dir
         self.files = {
-            'caffe_weight': {'object': None,
-                           'upload_dir': '',
-                             'filename': '',
-                           'convert_dir': '',
-                           },
-            'caffe_model': {'object': None,
-                             'upload_dir': '',
-                            'filename': '',
-                             'convert_dir': '',
-                             }}
+            'caffe_weight': {
+                'object': None,
+                'upload_dir': '',
+                'filename': '',
+                'save_dir': '',
+            },
+            'caffe_model': {
+                'object': None,
+                'upload_dir': '',
+                'filename': '',
+                'save_dir': '',
+            }
+        }
         self.form = request.form
         self.resolve_files(request)
 
-    def resolve_files(self,request):
+    def resolve_files(self, request):
         if 'caffe_weight' in request.files:
-            self.files['caffe_weight']['object'] = request.files['caffe_weight']
+            self.files['caffe_weight']['object'] = request.files[
+                'caffe_weight']
+            self.files['caffe_weight']['filename'] = request.files[
+                'caffe_weight'].filename.split('.')[0]
         if 'caffe_model' in request.files:
             self.files['caffe_model']['object'] = request.files['caffe_model']
+            self.files['caffe_model']['filename'] = request.files[
+                'caffe_model'].filename.split('.')[0]
 
     def save(self):
         updir = os.path.join(self.upload_base_dir, self.id)
@@ -140,29 +169,32 @@ class CaffeModel():
         self.files['caffe_weight']['upload_dir'] = caffe_weight_dir
         caffe_model.save(caffe_model_dir)
         self.files['caffe_model']['upload_dir'] = caffe_model_dir
+        save_base_dir = os.path.join(self.convert_base_dir, self.id)
+        save_dir = os.path.join(save_base_dir + '/' +
+                                self.files['caffe_model']['filename'])
+        self.files['caffe_model']['save_dir'] = save_dir
+        self.files['caffe_weight']['save_dir'] = save_dir
 
     def convert(self):
         filename = self.files['caffe_model']['filename']
         save_base_dir = os.path.join(self.convert_base_dir, self.id)
-        save_dir = os.path.join(self.convert_base_dir, self.id + '/' + filename)
+        save_dir = self.files['caffe_model']['save_dir']
         weight_path = os.path.join(self.files['caffe_weight']['upload_dir'])
         model_path = os.path.join(self.files['caffe_model']['upload_dir'])
-        cmd = 'x2paddle' + ' --framework=caffe' + ' --prototxt=' + model_path + ' --weight=' + weight_path + ' --save_dir=' + save_dir
+        cmd = 'x2paddle' + ' --framework=caffe' + ' --prototxt=' + model_path + \
+            ' --weight=' + weight_path + ' --save_dir=' + save_dir
         return run_script(cmd, filename, save_base_dir)
 
     def check_filetype(self):
         weight_name = self.files['caffe_weight']['object'].filename
-        model_name = self.files['caffe_weight']['object'].filename
+        model_name = self.files['caffe_model']['object'].filename
 
-        support_type = ['onnx', 'pb', 'caffemodel', 'prototxt']
+        caffe_model_support_type = ['prototxt', 'proto', 'pt']
 
-        valid_weight_name =  '.' in weight_name and \
-               weight_name.rsplit('.', 1)[1] in support_type
+        valid_weight_name = '.' in weight_name and weight_name.split(
+            '.')[-1] == 'caffemodel'
 
-        valid_model_name =  '.' in model_name and \
-               model_name.rsplit('.', 1)[1] in support_type
+        valid_model_name = '.' in model_name and model_name.split(
+            '.')[-1] in caffe_model_support_type
 
-        if valid_weight_name and valid_model_name:
-            return True
-
-        return False
+        return valid_weight_name and valid_model_name
